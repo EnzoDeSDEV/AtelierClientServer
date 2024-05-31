@@ -3,68 +3,6 @@ const express = require("express");
 const app = express();
 const oracledb = require("oracledb");
 
-// Set EJS as the view engine
-app.set("view engine", "ejs");
-
-// Define the directory where your HTML files (views) are located
-app.set("views", path.join(__dirname, "views"));
-
-// Optionally, you can define a static files directory (CSS, JS, images, etc.)
-app.use(express.static(path.join(__dirname, "public")));
-
-app.use(express.json());
-
-// ROUTE GET 
-
-app.get("/", async (req, res) => {
-  res.render("index"); // Assuming you have an "index.ejs" file in the "views" directory
-});
-app.get("/users", async (req, res) => {
-  const getUsersSQL = `select * from users`;
-  const result = await connection.execute(getUsersSQL);
-
-  res.json(result.rows);
-});
-app.get("/views/:userId", async (req, res) => {
-    const getCurrentUserSQL = `select * from users where id = :1`;
-    const getAccountsSQL = `select * from accounts where user_id = :1`;
-    const [currentUser, accounts] = await Promise.all([
-      connection.execute(getCurrentUserSQL, [req.params.userId]),
-      connection.execute(getAccountsSQL, [req.params.userId]),
-    ]);
-  
-    console.log(currentUser, accounts);
-    res.render("user-view", {
-      currentUser: currentUser.rows[0],
-      accounts: accounts.rows,
-    });
-  });
-app.get("/accounts", async (res,req) => {
-  
-});
-
-//ROUTE POST
-
-app.post("/users", async (req, res) => {
-    const createUserSQL = `BEGIN
-      insert_user(:name, :email, :user_id);
-    END;`;
-    const result = await connection.execute(createUserSQL, {
-      name: req.body.name,
-      email: req.body.email,
-      user_id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
-    });
-  
-    console.log(result);
-    if (result.outBinds && result.outBinds.user_id) {
-      res.redirect(`/views/${result.outBinds.user_id}`);
-      res.status(200).json("Information bien insérer")
-    } else {
-      res.sendStatus(500);
-    }
-  });
-
-
 connectToDatabase().then(async () => {
   await setupDatabase();
   app.listen(4000, () => {
@@ -147,3 +85,64 @@ async function setupDatabase() {
   console.log(accountsResult.rowsAffected, "Accounts rows inserted");
   connection.commit(); // Now query the rows back
 }
+
+// Set EJS as the view engine
+app.set("view engine", "ejs");
+
+// Define the directory where your HTML files (views) are located
+app.set("views", path.join(__dirname, "views"));
+
+// Optionally, you can define a static files directory (CSS, JS, images, etc.)
+app.use(express.static(path.join(__dirname, "public")));
+
+app.use(express.json());
+
+// ROUTE GET 
+
+app.get("/", async (req, res) => {
+  res.render("index"); // Assuming you have an "index.ejs" file in the "views" directory
+});
+app.get("/users", async (req, res) => {
+  const getUsersSQL = `select * from users`;
+  const result = await connection.execute(getUsersSQL);
+
+  res.json(result.rows);
+});
+app.get("/views/:userId", async (req, res) => {
+    const getCurrentUserSQL = `select * from users where id = :1`;
+    const getAccountsSQL = `select * from accounts where user_id = :1`;
+    const [currentUser, accounts] = await Promise.all([
+      connection.execute(getCurrentUserSQL, [req.params.userId]),
+      connection.execute(getAccountsSQL, [req.params.userId]),
+    ]);
+  
+    console.log(currentUser, accounts);
+    res.render("user-view", {
+      currentUser: currentUser.rows[0],
+      accounts: accounts.rows,
+    });
+  });
+app.get("/accounts", async (res,req) => {
+  
+});
+
+//ROUTE POST
+
+app.post("/users", async (req, res) => {
+    const createUserSQL = `BEGIN
+      insert_user(:name, :email, :user_id);
+    END;`;
+    const result = await connection.execute(createUserSQL, {
+      name: req.body.name,
+      email: req.body.email,
+      user_id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+    });
+  
+    console.log(result);
+    if (result.outBinds && result.outBinds.user_id) {
+      res.redirect(`/views/${result.outBinds.user_id}`);
+      res.status(200).json("Information bien insérer")
+    } else {
+      res.sendStatus(500);
+    }
+  });
