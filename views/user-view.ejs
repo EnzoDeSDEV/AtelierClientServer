@@ -5,4 +5,16 @@
   <span><%= account.NAME %></span>
   <span><%= account.AMOUNT %>$</span>
 </div>
+<h3>Ajouter un Compte</h3>
+<form action="/accounts" method="POST">
+  <label for="name">Nom du Compte:</label>
+  <input type="text" id="name" name="name" required />
+  <br />
+  <label for="amount">Montant:</label>
+  <input type="number" id="amount" name="amount" required />
+  <br />
+  <a href="user-view.ejs">
+    <button type="submit">Ajouter Compte</button>
+  </a>
+</form>
 <% }); %>

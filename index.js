@@ -10,7 +10,6 @@ connectToDatabase().then(async () => {
   });
 });
 
-
 let connection;
 
 async function connectToDatabase() {
@@ -70,6 +69,18 @@ async function setupDatabase() {
       VALUES (p_user_name, p_user_email)
       RETURNING id INTO p_user_id;
   END;`
+  );  
+  await connection.execute(
+    `CREATE OR REPLACE PROCEDURE insert_accounts (
+      p_account_name IN accounts.name%TYPE,
+      p_account_amount IN accounts.amount%TYPE,
+      p_user_id IN accounts.user_id%TYPE
+    ) AS
+    BEGIN
+      INSERT INTO accounts (name, amount, user_id)
+      VALUES (p_account_name, p_account_amount, p_user_id);
+      UPDATE users SET accounts = accounts + 1 WHERE id = p_user_id;
+    END;`
   );
   // Insert some data
   const usersSql = `insert into users (name, email, accounts) values(:1, :2, :3)`;
@@ -97,7 +108,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.use(express.json());
 
-// ROUTE GET 
+// ROUTE GET
 
 app.get("/", async (req, res) => {
   res.render("index"); // Assuming you have an "index.ejs" file in the "views" directory
@@ -109,40 +120,60 @@ app.get("/users", async (req, res) => {
   res.json(result.rows);
 });
 app.get("/views/:userId", async (req, res) => {
-    const getCurrentUserSQL = `select * from users where id = :1`;
-    const getAccountsSQL = `select * from accounts where user_id = :1`;
-    const [currentUser, accounts] = await Promise.all([
-      connection.execute(getCurrentUserSQL, [req.params.userId]),
-      connection.execute(getAccountsSQL, [req.params.userId]),
-    ]);
-  
-    console.log(currentUser, accounts);
-    res.render("user-view", {
-      currentUser: currentUser.rows[0],
-      accounts: accounts.rows,
-    });
+  const getCurrentUserSQL = `select * from users where id = :1`;
+  const getAccountsSQL = `select * from accounts where user_id = :1`;
+  const [currentUser, accounts] = await Promise.all([
+    connection.execute(getCurrentUserSQL, [req.params.userId]),
+    connection.execute(getAccountsSQL, [req.params.userId]),
+  ]);
+
+  console.log(currentUser, accounts);
+  res.render("user-view", {
+    currentUser: currentUser.rows[0],
+    accounts: accounts.rows,
   });
-app.get("/accounts", async (res,req) => {
-  
+});
+app.get("/accounts", async (req, res) => {
+  const getAccountsSQL = `select * from accounts`;
+  const result = await connection.execute(getAccountsSQL);
+
+  res.json(result.rows);
 });
 
 //ROUTE POST
 
 app.post("/users", async (req, res) => {
-    const createUserSQL = `BEGIN
+  const createUserSQL = `BEGIN
       insert_user(:name, :email, :user_id);
     END;`;
-    const result = await connection.execute(createUserSQL, {
+  const result = await connection.execute(createUserSQL, {
+    name: req.body.name,
+    email: req.body.email,
+    user_id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+  });
+
+  console.log(result);
+  if (result.outBinds && result.outBinds.user_id) {
+    res.redirect(`/views/${result.outBinds.user_id}`);
+    res.status(200).json("Information bien insérer");
+  } else {
+    res.sendStatus(500);
+  }
+});
+app.post("/accounts", async (req, res) => {
+    const createAccountsSQL = `
+    BEGIN
+      insert_accounts(:name, :amount, :user_id);
+    END;`;
+    const result = await connection.execute(createAccountsSQL, {
       name: req.body.name,
-      email: req.body.email,
-      user_id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+      amount: req.body.amount,
+      user_id: req.body.user_id,
     });
-  
     console.log(result);
-    if (result.outBinds && result.outBinds.user_id) {
-      res.redirect(`/views/${result.outBinds.user_id}`);
-      res.status(200).json("Information bien insérer")
+    if (result.rowsAffected && result.rowsAffected > 0) {
+      res.status(500).json({ message: "Internal server error" });
     } else {
-      res.sendStatus(500);
+      res.status(200).json({ message: "Information bien insérée" });
     }
   });
